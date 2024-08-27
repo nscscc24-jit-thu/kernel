@@ -1,0 +1,331 @@
+From f898824ce41319c6705cfe873f6cf116ab7fed5d Mon Sep 17 00:00:00 2001
+From: Joker Loser <zhaohy22@mails.tsinghua.edu.cn>
+Date: Sat, 27 Jul 2024 20:23:15 +0800
+Subject: [PATCH 14/15] LoongArch: disable clocksource based on rdtime and use
+ external timer instead
+
+Signed-off-by: Joker Loser <zhaohy22@mails.tsinghua.edu.cn>
+---
+ .config                                       |   4 +
+ arch/loongarch/Kconfig                        |   1 +
+ .../boot/dts/loongson/loongson32_ls.dts       |   6 +
+ arch/loongarch/kernel/time.c                  | 202 +-----------------
+ arch/loongarch/loongson32/irq.c               |  19 +-
+ 5 files changed, 29 insertions(+), 203 deletions(-)
+
+diff --git a/.config b/.config
+index ce672e707a8c..58b19bc4a60e 100644
+--- a/.config
++++ b/.config
+@@ -118,6 +118,7 @@ CONFIG_IKCONFIG_PROC=y
+ # CONFIG_IKHEADERS is not set
+ CONFIG_LOG_BUF_SHIFT=18
+ CONFIG_PRINTK_SAFE_LOG_BUF_SHIFT=13
++CONFIG_GENERIC_SCHED_CLOCK=y
+ 
+ #
+ # Scheduler features
+@@ -1434,6 +1435,9 @@ CONFIG_COMMON_CLK=y
+ #
+ # Clock Source drivers
+ #
++CONFIG_TIMER_OF=y
++CONFIG_TIMER_PROBE=y
++CONFIG_CLINT_TIMER_LA32R=y
+ # CONFIG_MICROCHIP_PIT64B is not set
+ # end of Clock Source drivers
+ 
+diff --git a/arch/loongarch/Kconfig b/arch/loongarch/Kconfig
+index acddfb0ad116..aaea6d8794fa 100644
+--- a/arch/loongarch/Kconfig
++++ b/arch/loongarch/Kconfig
+@@ -56,6 +56,7 @@ config LOONGARCH
+ 	select GENERIC_LIB_CMPDI2
+ 	select GENERIC_LIB_LSHRDI3
+ 	select GENERIC_LIB_UCMPDI2
++	select GENERIC_SCHED_CLOCK
+ 	select GENERIC_SMP_IDLE_THREAD
+ 	select GENERIC_STRNCPY_FROM_USER
+ 	select GENERIC_STRNLEN_USER
+diff --git a/arch/loongarch/boot/dts/loongson/loongson32_ls.dts b/arch/loongarch/boot/dts/loongson/loongson32_ls.dts
+index 13fa38937c98..3f80eacf4d96 100644
+--- a/arch/loongarch/boot/dts/loongson/loongson32_ls.dts
++++ b/arch/loongarch/boot/dts/loongson/loongson32_ls.dts
+@@ -46,6 +46,12 @@ soc {
+ 		#size-cells = <1>;
+ 		ranges = <0x10000000 0x10000000 0x10000000>;
+ 
++		clint9: timer@1fd0e000 {
++			compatible = "loongarch,clint9";
++			reg = <0x1fd0e000 0x100>;
++			interrupts-extended = <&cpuic 7>;
++		};
++
+ 		cpu_uart0: serial@0x1fe00000 {
+ 			compatible = "ns16550a";
+ 			reg = <0x1fe00000  0x10>;
+diff --git a/arch/loongarch/kernel/time.c b/arch/loongarch/kernel/time.c
+index 4719310fb379..b732d4797715 100644
+--- a/arch/loongarch/kernel/time.c
++++ b/arch/loongarch/kernel/time.c
+@@ -10,6 +10,7 @@
+ #include <linux/interrupt.h>
+ #include <linux/delay.h>
+ #include <linux/kernel.h>
++#include <linux/of_clk.h>
+ #include <linux/sched_clock.h>
+ #include <linux/spinlock.h>
+ 
+@@ -17,205 +18,8 @@
+ #include <asm/loongarchregs.h>
+ #include <asm/time.h>
+ 
+-u64 const_clock_freq;
+-EXPORT_SYMBOL(const_clock_freq);
+-u64 cpu_clock_freq;
+-EXPORT_SYMBOL(cpu_clock_freq);
+-static DEFINE_SPINLOCK(state_lock);
+-static DEFINE_PER_CPU(struct clock_event_device, constant_clockevent_device);
+-
+-static void constant_event_handler(struct clock_event_device *dev)
+-{
+-}
+-
+-irqreturn_t constant_timer_interrupt(int irq, void *data)
+-{
+-	int cpu = smp_processor_id();
+-	struct clock_event_device *cd;
+-
+-	/* Clear Timer Interrupt */
+-	write_csr_tintclear(CSR_TINTCLR_TI);
+-	cd = &per_cpu(constant_clockevent_device, cpu);
+-	cd->event_handler(cd);
+-
+-	return IRQ_HANDLED;
+-}
+-
+-static int constant_set_state_oneshot(struct clock_event_device *evt)
+-{
+-	unsigned long timer_config;
+-
+-	spin_lock(&state_lock);
+-
+-	timer_config = csr_readq(LOONGARCH_CSR_TCFG);
+-	timer_config |=  CSR_TCFG_EN;
+-	timer_config &= ~CSR_TCFG_PERIOD;
+-	csr_writeq(timer_config, LOONGARCH_CSR_TCFG);
+-
+-	spin_unlock(&state_lock);
+-
+-	return 0;
+-}
+-
+-static int constant_set_state_oneshot_stopped(struct clock_event_device *evt)
+-{
+-	return 0;
+-}
+-
+-static int constant_set_state_periodic(struct clock_event_device *evt)
+-{
+-	u64 period;
+-	unsigned long timer_config;
+-
+-	spin_lock(&state_lock);
+-
+-	period = const_clock_freq;
+-	do_div(period, HZ);
+-
+-	timer_config = period & CSR_TCFG_VAL;
+-	timer_config |= (CSR_TCFG_PERIOD | CSR_TCFG_EN);
+-	csr_writeq(timer_config, LOONGARCH_CSR_TCFG);
+-
+-	spin_unlock(&state_lock);
+-
+-	return 0;
+-}
+-
+-static int constant_set_state_shutdown(struct clock_event_device *evt)
+-{
+-	return 0;
+-}
+-
+-static int constant_timer_next_event(unsigned long delta, struct clock_event_device *evt)
+-{
+-	unsigned long timer_config;
+-
+-	delta &= CSR_TCFG_VAL;
+-	timer_config = delta | CSR_TCFG_EN;
+-	csr_writeq(timer_config, LOONGARCH_CSR_TCFG);
+-
+-	return 0;
+-}
+-
+-static unsigned long __init get_loops_per_jiffy(void)
+-{
+-	u64 lpj = const_clock_freq;
+-
+-	do_div(lpj, HZ);
+-
+-	return lpj;
+-}
+-
+-#ifdef CONFIG_SMP
+-/*
+- * If we have a constant timer are using it for the delay loop, we can
+- * skip clock calibration if another cpu in the same socket has already
+- * been calibrated. This assumes that constant timer applies to all
+- * cpus in the socket - this should be a safe assumption.
+- */
+-unsigned long calibrate_delay_is_known(void)
+-{
+-	int next, cpu = smp_processor_id();
+-	const struct cpumask *mask = topology_core_cpumask(cpu);
+-
+-	if (!mask)
+-		return 0;
+-
+-	next = cpumask_any_but(mask, cpu);
+-	if (next < nr_cpu_ids)
+-		return cpu_data[next].udelay_val;
+-
+-	return 0;
+-}
+-#endif
+-
+-int constant_clockevent_init(void)
+-{
+-	unsigned int irq;
+-	unsigned int cpu = smp_processor_id();
+-	unsigned long min_delta = 0x600;
+-	unsigned long max_delta = (1ULL << 31) - 1;
+-	struct clock_event_device *cd;
+-	static int timer_irq_installed = 0;
+-
+-	irq = LOONGSON_TIMER_IRQ;
+-
+-	cd = &per_cpu(constant_clockevent_device, cpu);
+-	cd->name = "Constant";
+-	cd->features = CLOCK_EVT_FEAT_ONESHOT;
+-	cd->irq = irq;
+-	cd->rating = 320;
+-	cd->cpumask = cpumask_of(cpu);
+-	cd->set_state_oneshot = constant_set_state_oneshot;
+-	cd->set_state_oneshot_stopped = constant_set_state_oneshot_stopped;
+-	cd->set_state_periodic = constant_set_state_periodic;
+-	cd->set_state_shutdown = constant_set_state_shutdown;
+-	cd->set_next_event = constant_timer_next_event;
+-	cd->event_handler = constant_event_handler;
+-
+-	clockevents_config_and_register(cd, const_clock_freq, min_delta, max_delta);
+-
+-	if (timer_irq_installed)
+-		return 0;
+-
+-	timer_irq_installed = 1;
+-
+-	if (request_irq(irq, constant_timer_interrupt, IRQF_PERCPU | IRQF_TIMER, "timer", NULL))
+-		pr_err("Failed to request irq %d (timer)\n", irq);
+-
+-	set_csr_ecfg(0x800);
+-	lpj_fine = get_loops_per_jiffy();
+-	pr_info("Constant clock event device register\n");
+-
+-	return 0;
+-}
+-
+-static u64 read_const_counter(struct clocksource *clk)
+-{
+-	return drdtime();
+-}
+-
+-static struct clocksource clocksource_const = {
+-	.name = "Constant",
+-	.rating = 320,
+-	.read = read_const_counter,
+-	.mask = CLOCKSOURCE_MASK(64),
+-	.flags = CLOCK_SOURCE_IS_CONTINUOUS,
+-	.mult = 0,
+-	.shift = 10,
+-};
+-
+-u64 native_sched_clock(void)
+-{
+-	return read_const_counter(NULL);
+-}
+-
+-int __init constant_clocksource_init(void)
+-{
+-	int res;
+-	unsigned long freq;
+-
+-	freq = const_clock_freq;
+-
+-	clocksource_const.mult =
+-		clocksource_hz2mult(freq, clocksource_const.shift);
+-
+-	res = clocksource_register_hz(&clocksource_const, freq);
+-
+-	sched_clock_register(native_sched_clock, 64, freq);
+-
+-	pr_info("Constant clock source device register\n");
+-
+-	return res;
+-}
+-
+ void __init time_init(void)
+ {
+-	if (!cpu_has_cpucfg)
+-		const_clock_freq = cpu_clock_freq;
+-	else
+-		const_clock_freq = calc_const_freq();
+-
+-	constant_clockevent_init();
+-	constant_clocksource_init();
++	of_clk_init(NULL);
++	timer_probe();
+ }
+diff --git a/arch/loongarch/loongson32/irq.c b/arch/loongarch/loongson32/irq.c
+index 947ce357e32b..c3033ec40928 100644
+--- a/arch/loongarch/loongson32/irq.c
++++ b/arch/loongarch/loongson32/irq.c
+@@ -18,8 +18,9 @@
+ 
+ void mach_irq_dispatch(unsigned int pending)
+ {
+-	if (pending & 0x800)
+-		do_IRQ(LOONGSON_TIMER_IRQ);
++	if (pending & 0x80) {
++		do_IRQ(LOONGSON_CPU_IRQ_BASE + 7); 	/* IP7 */
++	}
+ #ifndef CONFIG_BX_SOC
+ 	if (pending & 0x20)
+ 		do_IRQ(4);
+@@ -31,7 +32,17 @@ void mach_irq_dispatch(unsigned int pending)
+ 	else if (pending & 0x4)
+ 		do_IRQ(LOONGSON_CPU_IRQ_BASE + 2); 	/* IP2 */
+ 	else if (pending & 0x8)
+-		do_IRQ(LOONGSON_CPU_IRQ_BASE + 3); 	/* IP2 */
++		do_IRQ(LOONGSON_CPU_IRQ_BASE + 3); 	/* IP3 */
++	else if (pending & 0x10)
++		do_IRQ(LOONGSON_CPU_IRQ_BASE + 4); 	/* IP4 */
++	else if (pending & 0x20)
++		do_IRQ(LOONGSON_CPU_IRQ_BASE + 5); 	/* IP5 */
++	else if (pending & 0x40)
++		do_IRQ(LOONGSON_CPU_IRQ_BASE + 6); 	/* IP6 */
++	else if (pending & 0x100)
++		do_IRQ(LOONGSON_CPU_IRQ_BASE + 8); 	/* IP8 */
++	else if (pending & 0x200)
++		do_IRQ(LOONGSON_CPU_IRQ_BASE + 9); 	/* IP9 */
+ #endif
+ }
+ 
+@@ -55,5 +66,5 @@ void __init arch_init_irq(void)
+ 
+ 	setup_IRQ();
+ 
+-	set_csr_ecfg(ECFGF_IP0 | ECFGF_IP1 |ECFGF_IP2 | ECFGF_IP3| ECFGF_IPI | ECFGF_PC);
++	set_csr_ecfg(ECFGF_IP0 | ECFGF_IP1 |ECFGF_IP2 | ECFGF_IP3 | ECFGF_IP5 | ECFGF_IPI | ECFGF_PC);
+ }
+-- 
+2.39.2
+

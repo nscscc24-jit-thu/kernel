@@ -1,0 +1,45 @@
+From 3063d218f5423f0d90f2d6e1e2dd42339a5c7c56 Mon Sep 17 00:00:00 2001
+From: Joker Loser <zhaohy22@mails.tsinghua.edu.cn>
+Date: Sat, 20 Jul 2024 00:28:06 +0800
+Subject: [PATCH 11/15] loongarch: fix the setup_arch not loading kernel
+ cmd-line correctly
+
+Signed-off-by: Joker Loser <zhaohy22@mails.tsinghua.edu.cn>
+---
+ arch/loongarch/kernel/setup.c | 10 +---------
+ 1 file changed, 1 insertion(+), 9 deletions(-)
+
+diff --git a/arch/loongarch/kernel/setup.c b/arch/loongarch/kernel/setup.c
+index 976c91159090..0744e2a93d08 100644
+--- a/arch/loongarch/kernel/setup.c
++++ b/arch/loongarch/kernel/setup.c
+@@ -274,14 +274,6 @@ static void __init bootcmdline_append(const char *s, size_t max)
+ 
+ static void __init bootcmdline_init(char **cmdline_p)
+ {
+-	boot_command_line[0] = 0;
+-
+-	/*
+-	 * Take arguments from the bootloader at first. Early code should have
+-	 * filled arcs_cmdline with arguments from the bootloader.
+-	 */
+-	bootcmdline_append(arcs_cmdline, COMMAND_LINE_SIZE);
+-
+ 	strlcpy(command_line, boot_command_line, COMMAND_LINE_SIZE);
+ 	*cmdline_p = command_line;
+ 
+@@ -405,10 +397,10 @@ void __init setup_arch(char **cmdline_p)
+ #ifdef CONFIG_EARLY_PRINTK
+ 	setup_early_printk();
+ #endif
+-	bootcmdline_init(cmdline_p);
+ 
+ 	init_initrd();
+ 	platform_init();
++	bootcmdline_init(cmdline_p);
+ 	finalize_initrd();
+ 	cpu_report();
+ 
+-- 
+2.39.2
+

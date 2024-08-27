@@ -1,0 +1,28 @@
+From f7558d8a13960c3e9cc49fb1105f6320628e1ec0 Mon Sep 17 00:00:00 2001
+From: Joker Loser <zhaohy22@mails.tsinghua.edu.cn>
+Date: Sun, 7 Jul 2024 20:23:42 +0800
+Subject: [PATCH 04/15] loongarch: skip the clear of .bss for u-boot had done
+ it
+
+Signed-off-by: Joker Loser <zhaohy22@mails.tsinghua.edu.cn>
+---
+ arch/loongarch/kernel/head.S | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/arch/loongarch/kernel/head.S b/arch/loongarch/kernel/head.S
+index eb7779e612f1..e5f278b3aa2b 100644
+--- a/arch/loongarch/kernel/head.S
++++ b/arch/loongarch/kernel/head.S
+@@ -34,7 +34,8 @@ SYM_CODE_START(kernel_entry)    		# kernel entry point
+ dtb_found:
+ #endif
+ 
+-#if 1
++# u-boot has cleared for kernel
++#if 0
+ 	la		t0, __bss_start		# clear .bss
+ 	PTR_S		zero, t0, 0
+ 	la		t1, __bss_stop - LONGSIZE
+-- 
+2.39.2
+

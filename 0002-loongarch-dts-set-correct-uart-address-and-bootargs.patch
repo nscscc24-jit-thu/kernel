@@ -1,0 +1,38 @@
+From 543b86883609afbd9c4d93ddadda7103571411b0 Mon Sep 17 00:00:00 2001
+From: Joker Loser <zhaohy22@mails.tsinghua.edu.cn>
+Date: Sun, 7 Jul 2024 20:22:28 +0800
+Subject: [PATCH 02/15] loongarch: dts: set correct uart address and bootargs
+
+Signed-off-by: Joker Loser <zhaohy22@mails.tsinghua.edu.cn>
+---
+ arch/loongarch/boot/dts/loongson/loongson32_ls.dts | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/arch/loongarch/boot/dts/loongson/loongson32_ls.dts b/arch/loongarch/boot/dts/loongson/loongson32_ls.dts
+index cc11bbafcb18..c1c13c11d6eb 100644
+--- a/arch/loongarch/boot/dts/loongson/loongson32_ls.dts
++++ b/arch/loongarch/boot/dts/loongson/loongson32_ls.dts
+@@ -13,7 +13,7 @@ aliases {
+ 
+ 	chosen {
+ 		stdout-path = "serial0:115200n8";
+-		bootargs = "earlycon";
++		bootargs = "earlycon console=ttyS0,115200 rdinit=/init";
+ 	};
+ 
+ 	extioiic: interrupt-controller@0x1fe11600 {
+@@ -46,9 +46,9 @@ soc {
+ 		#size-cells = <1>;
+ 		ranges = <0x10000000 0x10000000 0x10000000>;
+ 
+-		cpu_uart0: serial@0x1fe001e0 {
++		cpu_uart0: serial@0x1fe00000 {
+ 			compatible = "ns16550a";
+-			reg = <0x1fe001e0  0x10>;
++			reg = <0x1fe00000  0x10>;
+ 			clock-frequency = <33000000>;
+ 			interrupt-parent = <&cpuic>;
+ 			interrupts = <3>;
+-- 
+2.39.2
+

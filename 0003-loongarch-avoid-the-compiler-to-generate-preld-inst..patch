@@ -1,0 +1,79 @@
+From 6dbea91fd1e5080656c4d318d1b55978f0f96416 Mon Sep 17 00:00:00 2001
+From: Joker Loser <zhaohy22@mails.tsinghua.edu.cn>
+Date: Sun, 7 Jul 2024 20:23:10 +0800
+Subject: [PATCH 03/15] loongarch: avoid the compiler to generate preld inst.
+ which we don't impl.
+
+Signed-off-by: Joker Loser <zhaohy22@mails.tsinghua.edu.cn>
+---
+ arch/loongarch/include/asm/asm.h       | 11 -----------
+ arch/loongarch/include/asm/prefetch.h  |  5 +----
+ arch/loongarch/include/asm/processor.h |  4 ++--
+ 3 files changed, 3 insertions(+), 17 deletions(-)
+
+diff --git a/arch/loongarch/include/asm/asm.h b/arch/loongarch/include/asm/asm.h
+index 27a103254ac4..fbeab0892d1b 100644
+--- a/arch/loongarch/include/asm/asm.h
++++ b/arch/loongarch/include/asm/asm.h
+@@ -39,21 +39,10 @@
+  * LoongArch implementations are free to treat this as a nop.  Loongson-3
+  * is one of them.  So we should have an option not to use this instruction.
+  */
+-#ifdef CONFIG_CPU_HAS_PREFETCH
+-
+-#define PREF(hint, addr, offs)				\
+-		preld	hint, addr, offs;		\
+-
+-#define PREFX(hint, addr, index)			\
+-		preldx	hint, addr, index;		\
+-
+-#else /* !CONFIG_CPU_HAS_PREFETCH */
+ 
+ #define PREF(hint, addr, offs)
+ #define PREFX(hint, addr, index)
+ 
+-#endif /* !CONFIG_CPU_HAS_PREFETCH */
+-
+ /*
+  * Stack alignment
+  */
+diff --git a/arch/loongarch/include/asm/prefetch.h b/arch/loongarch/include/asm/prefetch.h
+index cc584180ac1c..583bb75e3ff3 100644
+--- a/arch/loongarch/include/asm/prefetch.h
++++ b/arch/loongarch/include/asm/prefetch.h
+@@ -11,9 +11,6 @@
+ #ifdef __ASSEMBLY__
+ 
+ 	.macro	__pref hint addr
+-#ifdef CONFIG_CPU_HAS_PREFETCH
+-	preld	\hint, \addr, 0
+-#endif
+ 	.endm
+ 
+ 	.macro	pref_load addr
+@@ -26,4 +23,4 @@
+ 
+ #endif
+ 
+-#endif /* __ASM_PREFETCH_H */
++#endif /* __ASM_z_H */
+diff --git a/arch/loongarch/include/asm/processor.h b/arch/loongarch/include/asm/processor.h
+index f573d36c22b8..21ce06116051 100644
+--- a/arch/loongarch/include/asm/processor.h
++++ b/arch/loongarch/include/asm/processor.h
+@@ -209,10 +209,10 @@ unsigned long get_wchan(struct task_struct *p);
+ #ifdef CONFIG_CPU_HAS_PREFETCH
+ 
+ #define ARCH_HAS_PREFETCH
+-#define prefetch(x) __builtin_prefetch((x), 0, 1)
++#define prefetch(x) do {} while(0)
+ 
+ #define ARCH_HAS_PREFETCHW
+-#define prefetchw(x) __builtin_prefetch((x), 1, 1)
++#define prefetchw(x) do {} while(0)
+ 
+ #endif
+ 
+-- 
+2.39.2
+

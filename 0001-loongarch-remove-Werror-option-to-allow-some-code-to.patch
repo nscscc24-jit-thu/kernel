@@ -1,0 +1,27 @@
+From b8058c724643419b650b8a645892feb5a9b43a4e Mon Sep 17 00:00:00 2001
+From: Joker Loser <zhaohy22@mails.tsinghua.edu.cn>
+Date: Sun, 7 Jul 2024 20:21:22 +0800
+Subject: [PATCH 01/15] loongarch: remove Werror option to allow some code to
+ pass compile
+
+Signed-off-by: Joker Loser <zhaohy22@mails.tsinghua.edu.cn>
+---
+ arch/loongarch/Kbuild | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/loongarch/Kbuild b/arch/loongarch/Kbuild
+index e997ba117bd9..e62212f7b964 100644
+--- a/arch/loongarch/Kbuild
++++ b/arch/loongarch/Kbuild
+@@ -2,7 +2,7 @@
+ # -Werror can be disabled for specific files using:
+ # CFLAGS_<file.o> := -Wno-error
+ ifeq ($(W),)
+-subdir-ccflags-y := -Werror
++subdir-ccflags-y := -Wno-error
+ endif
+ 
+ # platform specific definitions
+-- 
+2.39.2
+

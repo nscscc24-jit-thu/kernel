@@ -1,0 +1,27 @@
+From 5e5ecbc61231fd9e6ad2bb4a1c78625990be3baf Mon Sep 17 00:00:00 2001
+From: Joker Loser <zhaohy22@mails.tsinghua.edu.cn>
+Date: Mon, 8 Jul 2024 01:54:34 +0800
+Subject: [PATCH 07/15] loongarch: dts: update the bootargs to have the root
+ point to initram block device
+
+Signed-off-by: Joker Loser <zhaohy22@mails.tsinghua.edu.cn>
+---
+ arch/loongarch/boot/dts/loongson/loongson32_ls.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/loongarch/boot/dts/loongson/loongson32_ls.dts b/arch/loongarch/boot/dts/loongson/loongson32_ls.dts
+index c1c13c11d6eb..21e058fab4f3 100644
+--- a/arch/loongarch/boot/dts/loongson/loongson32_ls.dts
++++ b/arch/loongarch/boot/dts/loongson/loongson32_ls.dts
+@@ -13,7 +13,7 @@ aliases {
+ 
+ 	chosen {
+ 		stdout-path = "serial0:115200n8";
+-		bootargs = "earlycon console=ttyS0,115200 rdinit=/init";
++		bootargs = "earlycon console=ttyS0,115200 rdinit=/init root=/dev/ram0";
+ 	};
+ 
+ 	extioiic: interrupt-controller@0x1fe11600 {
+-- 
+2.39.2
+

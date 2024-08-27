@@ -1,0 +1,26 @@
+From 2f527c7145d5175b5c1e687e95b1dec06d51377f Mon Sep 17 00:00:00 2001
+From: Joker Loser <zhaohy22@mails.tsinghua.edu.cn>
+Date: Sun, 7 Jul 2024 20:24:30 +0800
+Subject: [PATCH 06/15] loongarch: uart: set correct address of uart
+
+Signed-off-by: Joker Loser <zhaohy22@mails.tsinghua.edu.cn>
+---
+ arch/loongarch/loongson32/early_printk.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/loongarch/loongson32/early_printk.c b/arch/loongarch/loongson32/early_printk.c
+index 33eb23c7efe8..859a7d12d064 100644
+--- a/arch/loongarch/loongson32/early_printk.c
++++ b/arch/loongarch/loongson32/early_printk.c
+@@ -32,7 +32,7 @@ void prom_putchar(char c)
+ 	unsigned char *uart_base;
+ 
+ #ifdef CONFIG_LS_SOC
+-	uart_base = (unsigned char *)0x9fe001e0;
++	uart_base = (unsigned char *)0x9fe00000;
+ #elif CONFIG_BX_SOC
+ 	uart_base = (unsigned char *)0x9fe40000;
+ #endif
+-- 
+2.39.2
+

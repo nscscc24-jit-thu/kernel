@@ -1,0 +1,72 @@
+From b355f849085fc5e27326147f37e7ca6d21fdbab7 Mon Sep 17 00:00:00 2001
+From: Joker Loser <zhaohy22@mails.tsinghua.edu.cn>
+Date: Sun, 7 Jul 2024 20:24:12 +0800
+Subject: [PATCH 05/15] loongarch: skip env checks for bios or efi which is not
+ related to chiplab stuff
+
+Signed-off-by: Joker Loser <zhaohy22@mails.tsinghua.edu.cn>
+---
+ arch/loongarch/loongson32/env.c   | 4 ++++
+ arch/loongarch/loongson32/setup.c | 7 -------
+ 2 files changed, 4 insertions(+), 7 deletions(-)
+
+diff --git a/arch/loongarch/loongson32/env.c b/arch/loongarch/loongson32/env.c
+index d939dccafe40..2d95ed13e978 100644
+--- a/arch/loongarch/loongson32/env.c
++++ b/arch/loongarch/loongson32/env.c
+@@ -85,6 +85,7 @@ static int parse_screeninfo(struct _extention_list_hdr *head)
+ 	return 0;
+ }
+ 
++#if LA_USE_ENV
+ static int list_find(struct _extention_list_hdr *head)
+ {
+ 	struct _extention_list_hdr *fhead = head;
+@@ -121,9 +122,11 @@ static int get_bpi_version(void *signature)
+ {
+ 	return 1;
+ }
++#endif
+ 
+ void __init fw_init_environ(void)
+ {
++#if LA_USE_ENV
+ 	efi_bp = (struct bootparamsinterface *)_fw_envp;
+ 	loongson_sysconf.bpi_ver = get_bpi_version(&efi_bp->signature);
+ 
+@@ -136,6 +139,7 @@ void __init fw_init_environ(void)
+ 
+ 	if (list_find(efi_bp->extlist))
+ 		pr_warn("Scan bootparam failed\n");
++#endif
+ }
+ 
+ static int __init init_cpu_fullname(void)
+diff --git a/arch/loongarch/loongson32/setup.c b/arch/loongarch/loongson32/setup.c
+index 3372e581d986..27d88977e7c2 100644
+--- a/arch/loongarch/loongson32/setup.c
++++ b/arch/loongarch/loongson32/setup.c
+@@ -327,10 +327,6 @@ void __init platform_init(void)
+ 	/* init base address of io space */
+ 	set_io_port_base((unsigned long)
+ 		ioremap(LOONGSON_LIO_BASE, LOONGSON_LIO_SIZE));
+-	efi_init();
+-#ifdef CONFIG_ACPI_TABLE_UPGRADE
+-	acpi_table_upgrade();
+-#endif
+ 
+ 	loongson_fdt_blob = __dtb_begin;
+ 	__dt_setup_arch(loongson_fdt_blob);
+@@ -348,9 +344,6 @@ void __init platform_init(void)
+ 	dmi_setup();
+ 	smbios_parse();
+ 	pr_info("The BIOS Version: %s\n", b_info.bios_version);
+-
+-	efi_runtime_init();
+-
+ }
+ 
+ static int __init register_gop_device(void)
+-- 
+2.39.2
+

@@ -1,0 +1,33 @@
+From 99f734c28ddaf33e70d67d429bd18b90bcd49e4e Mon Sep 17 00:00:00 2001
+From: Joker Loser <zhaohy22@mails.tsinghua.edu.cn>
+Date: Mon, 8 Jul 2024 01:54:55 +0800
+Subject: [PATCH 08/15] loongarch: disable all things about PCI
+
+Signed-off-by: Joker Loser <zhaohy22@mails.tsinghua.edu.cn>
+---
+ arch/loongarch/Kconfig | 9 ---------
+ 1 file changed, 9 deletions(-)
+
+diff --git a/arch/loongarch/Kconfig b/arch/loongarch/Kconfig
+index e7e4b3485d50..4eea67aed0ab 100644
+--- a/arch/loongarch/Kconfig
++++ b/arch/loongarch/Kconfig
+@@ -544,15 +544,6 @@ config ZONE_DMA
+ config ZONE_DMA32
+ 	bool
+ 
+-menu "Bus options"
+-
+-config PCI_MMCONFIG
+-	bool
+-	default y
+-	depends on PCI && ACPI
+-
+-endmenu
+-
+ menu "Power management options"
+ 
+ source "drivers/acpi/Kconfig"
+-- 
+2.39.2
+
